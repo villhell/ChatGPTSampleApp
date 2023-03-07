@@ -1,0 +1,83 @@
+﻿@page "/"
+@using System.Text;
+@using System.Text.Json;
+@inject HttpClient httpClient
+@using System.Net.Http.Headers;
+
+<div>
+    <h1>Chat with ChatGPT</h1>
+    <input type="text" @bind-value="@userInput" />
+    <button @onclick="SendRequest">Send</button>
+    @if (response != null)
+    {
+        <p>@response</p>
+    }
+</div>
+
+@code {
+    private string userInput;
+    private string response;
+
+    private async Task SendRequest()
+    {
+        var chatGPTRequest = new ChatGptRequest
+        {
+            model = "gpt-3.5-turbo",
+            messages = new List<ChatGptMessage>()
+            {
+                new ChatGptMessage
+                {
+                    role = "user",
+                    content = userInput
+                },
+            },
+        };
+
+        var requestJson = JsonSerializer.Serialize(chatGPTRequest);
+        var requestMessage = new HttpRequestMessage(HttpMethod.Post, "https://api.openai.com/v1/chat/completions");
+        requestMessage.Content = new StringContent(requestJson, Encoding.UTF8, "application/json");
+        requestMessage.Headers.Authorization = new AuthenticationHeaderValue("Bearer", "API-KEY");
+
+        var responseMessage = await httpClient.SendAsync(requestMessage);
+        var responseJson = await responseMessage.Content.ReadAsStringAsync();
+        var responseObject = JsonSerializer.Deserialize<ChatGptResponse>(responseJson);
+        response = responseObject.choices[0].message.content;
+
+    }
+
+    public class ChatGptResponse
+    {
+        public string id { get; set; }
+        public string @object { get; set; }
+        public long created { get; set; }
+        public string model { get; set; }
+        public ChatGptUsage usage { get; set; }
+        public List<ChatGptChoice> choices { get; set; }
+    }
+
+    public class ChatGptUsage
+    {
+        public int prompt_tokens { get; set; }
+        public int completion_tokens { get; set; }
+        public int total_tokens { get; set; }
+    }
+
+    public class ChatGptChoice
+    {
+        public ChatGptMessage message { get; set; }
+        public string finish_reason { get; set; }
+        public int index { get; set; }
+    }
+
+    public class ChatGptMessage
+    {
+        public string role { get; set; }
+        public string content { get; set; }
+    }
+
+    public class ChatGptRequest
+    {
+        public string model { get; set; }
+        public List<ChatGptMessage> messages { get; set; }
+    }
+}
